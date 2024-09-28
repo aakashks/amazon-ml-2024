@@ -7,9 +7,9 @@ from tqdm import tqdm
 import os
 import gc
 
-image_folder = "/scratch/be205_29/images_test"
+image_folder = "~/data/images_test"
 output_folder = "output/"
-df_test = pd.read_csv("fracdata/weight_depth.csv")
+df_test = pd.read_csv("student_resource 3/dataset/test.csv")
 
 BATCH_SIZE = 128
 MODEL_ID = "Qwen/Qwen2-VL-7B-Instruct"

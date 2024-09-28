@@ -1,43 +1,56 @@
 import pandas as pd
 import os
-import urllib.request
-from tqdm import tqdm
+import aiohttp
+import aiofiles
+import asyncio
+from tqdm.asyncio import tqdm_asyncio
+from PIL import Image
 
-def download_image(image_link, save_folder, retries=3, delay=3):
+async def download_image(image_link, session, save_folder, retries=3, delay=3):
     if not isinstance(image_link, str):
         return
-
+    
     filename = os.path.basename(image_link)
     image_save_path = os.path.join(save_folder, filename)
 
     if os.path.exists(image_save_path):
         return
-
+    
     for _ in range(retries):
         try:
-            urllib.request.urlretrieve(image_link, image_save_path)
-            return
+            async with session.get(image_link) as response:
+                if response.status == 200:
+                    async with aiofiles.open(image_save_path, 'wb') as f:
+                        await f.write(await response.read())
+                    return
+                else:
+                    print(f"Error downloading {image_link}: Status {response.status}")
         except Exception as e:
             print(f"Error downloading {image_link}: {e}")
+            await asyncio.sleep(delay)
     
-    create_placeholder_image(image_save_path) 
+    await create_placeholder_image(image_save_path) 
 
-def create_placeholder_image(image_save_path):
+async def create_placeholder_image(image_save_path):
     try:
-        from PIL import Image
         placeholder_image = Image.new('RGB', (100, 100), color='black')
-        placeholder_image.save(image_save_path)
+        async with aiofiles.open(image_save_path, 'wb') as f:
+            placeholder_image.save(f, format='JPEG')
     except Exception as e:
         print(f"Error creating placeholder image: {e}")
 
-df_test = pd.read_csv('student_resource 3/dataset/test.csv')
+async def main():
+    df_test = pd.read_csv('student_resource 3/dataset/test.csv')
+    download_folder = 'images'
+    os.makedirs(download_folder, exist_ok=True)
 
-download_folder = 'images'
-os.makedirs(download_folder, exist_ok=True)
+    image_links = df_test['image_link'].tolist()
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = [download_image(img_link, session, download_folder) for img_link in image_links]
+        await tqdm_asyncio.gather(*tasks, desc="Downloading images")
 
-image_links = df_test['image_link'].tolist()
+    print(f"Images have been downloaded to {download_folder}")
 
-for img_link in tqdm(image_links, desc="Downloading images"):
-    download_image(img_link, download_folder)
-
-print(f"Images have been downloaded to {download_folder}")
+if __name__ == '__main__':
+    asyncio.run(main())

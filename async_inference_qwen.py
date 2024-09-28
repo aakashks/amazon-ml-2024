@@ -7,15 +7,15 @@ import os
 import gc
 
 # Configuration
-IMAGE_FOLDER = "/scratch/be205_29/images_test"
-OUTPUT_FOLDER = "outputt/"
+IMAGE_FOLDER = "images_test"
+OUTPUT_FOLDER = "output/"
 CSV_PATH = "fracdata/dataset_part0.csv"
 
 OPENAI_API_KEY = "EMPTY"
 OPENAI_API_BASE = "http://0.0.0.0:8080/v1"
 MODEL_NAME = "Qwen/Qwen2-VL-7B-Instruct"
 
-CONCURRENT_REQUESTS = 64  # Number of concurrent API requests
+CONCURRENT_REQUESTS = 100  # Number of concurrent API requests
 BATCH_SIZE = 1000         # Number of images to process before writing to disk
 
 # Ensure output directory exists
@@ -52,13 +52,18 @@ async def fetch(session, semaphore, image_url, index, entity_name):
                 "Content-Type": "application/json",
             }
 
-            async with session.post(f"{OPENAI_API_BASE}/chat/completions", json=payload, headers=headers) as response:
+            # Set a specific timeout for the request
+            request_timeout = aiohttp.ClientTimeout(total=5)  # 5-second timeout
+
+            async with session.post(f"{OPENAI_API_BASE}/chat/completions", json=payload, headers=headers, timeout=request_timeout) as response:
                 if response.status == 200:
                     data = await response.json()
                     # Adjust based on actual response structure
                     vlm_output = data['choices'][0]['message']['content']
                 else:
                     vlm_output = f"Error: {response.status}"
+        except asyncio.TimeoutError:
+            vlm_output = "Timeout Error: Request took longer"
         except Exception as e:
             vlm_output = f"Exception: {str(e)}"
 
